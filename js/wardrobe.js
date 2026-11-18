@@ -87,7 +87,21 @@
     if (withLocks) o.__locks = true;
     undo.push(JSON.stringify(o)); if (undo.length > 30) undo.shift();
   }
-  function commit(note) { lastNote = note || ''; api.commit(); render(); }
+  function commit(note) { const fixed = fitPatterns(); lastNote = [note, fixed].filter(Boolean).join(' '); api.commit(); render(); }
+  /* A pattern has to exist in its cloth (garments.js, CLOTH_PATS): whatever changed a piece's type,
+     cloth or pattern (a button, a fix, Keep this), a pattern its cloth cannot carry becomes plain. */
+  function clothWord(c) { return c.name.replace(/ \(shiny\)$/, '').replace(/^Cotton twill \(chino\)$/, 'cotton twill').toLowerCase(); }
+  function fitPatterns() {
+    const notes = [];
+    G.SLOTS.forEach(function (k) {
+      const x = S().outfit[k]; if (!x) return;
+      const pat = VP.norm(x.pat), c = G.cloth(k, x);
+      if (pat.type === 'solid' || !c || G.patOK(c.id, pat.type)) return;
+      x.pat = { type: 'solid' };
+      if (x.on !== false) notes.push('The ' + lname(k) + ' is now plain: ' + VP.byId[pat.type].name.toLowerCase() + ' is not made in ' + clothWord(c) + '.');
+    });
+    return notes.join(' ');
+  }
 
   /* ---------- Rendering ---------- */
   function render() {
@@ -620,17 +634,21 @@
     const hex2 = pat.type === 'solid' ? (byStep[0] || '#f7f6f2') : pat.hex2;
     const cls = pat.type === 'solid' ? null : VP.scaleClass(pat.scale);
     body.innerHTML = clothHtml(k, x) +
-      '<h4>Pattern</h4><p class="ed-note">The patterns the guide uses on a ' + lname(k) + ', up to ' + kindOf(k).maxScale + ' scale. Typical use under each.</p>' +
+      '<h4>Pattern</h4><p class="ed-note">The patterns the guide uses on a ' + lname(k) + ', up to ' + kindOf(k).maxScale + ' scale. Typical use under each' +
+        (function () { const cl = G.cloth(k, x); const n = cl ? kindOf(k).pats.filter(function (t) { return !G.patOK(cl.id, t); }).length : 0;
+          return n ? '; greyed out: not made in ' + esc(clothWord(cl)) + '. Choose another cloth above for those.' : '.'; })() + '</p>' +
       '<div class="pat-grid">' + VP.TYPES.filter(function (t) { return kindOf(k).pats.indexOf(t.id) >= 0; }).map(function (t) {
-        const tp = { type: t.id, scale: t.scale, hex2: hex2 };
-        return '<button type="button" class="pat' + (pat.type === t.id ? ' sel' : '') + '" data-type="' + t.id + '">' +
+        const tp = { type: t.id, scale: t.scale, hex2: hex2 }, cl = G.cloth(k, x), can = !cl || G.patOK(cl.id, t.id);
+        return '<button type="button" class="pat' + (pat.type === t.id ? ' sel' : '') + (can ? '' : ' no-cloth') + '" data-type="' + t.id + '"' +
+          (can ? '' : ' disabled title="Not made in ' + esc(clothWord(cl)) + '"') + '>' +
           '<span class="pat-img" style="' + (t.id === 'solid' ? 'background:' + x.hex : 'background-image:url(' + VP.thumb(x.hex, tp, t.scale < 1 ? 10 : t.scale > 4 ? 46 : 18, t.scale > 4 ? 2 : 4) + ')') + '"></span>' +
-          '<span class="pat-name">' + t.name + '</span><span class="pat-use">' + t.use + '</span></button>';
+          '<span class="pat-name">' + t.name + '</span><span class="pat-use">' + (can ? t.use : 'not made in ' + esc(clothWord(cl))) + '</span></button>';
       }).join('') + '</div>' +
       (pat.type === 'solid' ? '' :
         '<h4>Scale</h4>' +
-        '<label class="s-slider scale-slider"><span>Repeat</span><input type="range" class="pat-scale" min="0" max="100" step="0.5" value="' + toPos(pat.scale).toFixed(1) + '">' +
-        '<span class="ends"><span>0.15 cm</span><span>20 cm</span></span></label>' +
+        '<label class="s-slider scale-slider"><span>Repeat</span><input type="range" class="pat-scale" min="' + toPos(VP.byId[pat.type].min || 0.15).toFixed(1) + '" max="' + toPos(VP.byId[pat.type].max || 20).toFixed(1) + '" step="0.5" value="' + toPos(pat.scale).toFixed(1) + '">' +
+        '<span class="ends"><span>' + (VP.byId[pat.type].min || 0.15) + ' cm</span><span>' + (VP.byId[pat.type].max || 20) + ' cm</span></span></label>' +
+        '<p class="ed-note">' + VP.byId[pat.type].name + ' is made from ' + (VP.byId[pat.type].min || 0.15) + ' to ' + (VP.byId[pat.type].max || 20) + ' cm a repeat.</p>' +
         '<p class="scale-read"><strong class="sc-cm">' + pat.scale + ' cm</strong> <span class="tierpill sc-cls">' + cls.label + '</span> <span class="sc-hand">' + cls.hand + '</span></p>' +
         '<h4>Second colour</h4><p class="ed-note">Colours already in the outfit come first: patterns that share a colour hold together.</p>' +
         '<div class="acc-row">' + uniq.map(function (h) {
@@ -649,6 +667,7 @@
       piece(k).pat = np; commit(kindOf(k).name + ': ' + patLabel(piece(k)) + '.');
     };
     $$('.pat', body).forEach(function (b) {
+      if (b.disabled) return;                       // not made in this cloth: no preview, no choice
       const t = VP.byId[b.dataset.type];
       const np = function () { return t.id === 'solid' ? { type: 'solid' } : { type: t.id, scale: pat.type === t.id ? pat.scale : t.scale, hex2: hex2 }; };
       previewOn(b, k, function () { return { hex: x.hex, pat: np() }; });

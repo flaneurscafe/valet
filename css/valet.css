@@ -950,3 +950,8 @@ button.gl-c.pk-no { text-decoration: line-through; text-decoration-color: var(--
 
 /* The licence line in the footer */
 .foot .foot-lic { font-size: 0.78rem; color: var(--muted); margin-top: 0.3rem; }
+
+/* A pattern the chosen cloth cannot carry: shown, greyed out, with the reason */
+.pat.no-cloth { opacity: 0.4; cursor: not-allowed; }
+.pat.no-cloth .pat-img { filter: grayscale(0.6); }
+.pat.no-cloth .pat-use { font-style: italic; }

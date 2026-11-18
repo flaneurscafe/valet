@@ -70,7 +70,9 @@
   function norm(pat) {
     if (!pat || !byId[pat.type] || pat.type === 'solid') return { type: 'solid' };
     const t = byId[pat.type];
-    return { type: pat.type, scale: Math.max(0.1, Math.min(25, +pat.scale || t.scale)), hex2: pat.hex2 || '#f7f6f2' };
+    // each pattern keeps to the repeat it is made in (a 15 cm pinstripe or a 3 mm windowpane does not exist)
+    const lo = t.min || 0.1, hi = t.max || 25;
+    return { type: pat.type, scale: Math.max(lo, Math.min(hi, +pat.scale || t.scale)), hex2: pat.hex2 || '#f7f6f2' };
   }
 
   /* The colour a pattern adds up to from a distance: the two colours mixed by area, in linear

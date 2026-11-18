@@ -137,6 +137,9 @@
       if (out[k].length != null && ['short', 'regular', 'long'].indexOf(out[k].length) < 0) delete out[k].length;
       if (!out[k].pat || typeof out[k].pat !== 'object') out[k].pat = { type: 'solid' };
       else if (out[k].pat.hex2 != null && !isHex(out[k].pat.hex2)) { out[k].pat = Object.assign({}, out[k].pat); delete out[k].pat.hex2; }
+      // a pattern the garment does not take, or its cloth cannot carry, is worn plain
+      const kd = window.VGARM.byKey[k].kinds.find(function (t) { return t.id === out[k].kind; }), pt = out[k].pat.type, cl = window.VGARM.cloth(k, out[k]);
+      if (pt && pt !== 'solid' && ((kd && kd.pats.indexOf(pt) < 0) || (cl && !window.VGARM.patOK(cl.id, pt)))) out[k].pat = { type: 'solid' };
     });
     if (o && o.jacketOn === false) out.jacket.on = false;
     // Until v1.3 the scarf was a kind of neckwear: move such a scarf to its own position.

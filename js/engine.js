@@ -678,7 +678,7 @@
     if (o.propOn && !o.study) proportionChecks(o, L, K, add, nm);
 
     /* --- accessories --- */
-    accessoryChecks(o.acc || {}, L, K, p, add, nm, o.occasion);
+    accessoryChecks(o.acc || {}, L, K, p, add, nm, o.occasion, o);
     const fw = frameWeight(p);
     if (fw) add({ id: 'gweight', group: 'accessory', level: 'A/B', score: fw.score, slots: [], text: fw.text });
     return out;
@@ -789,8 +789,14 @@
     shiny.forEach(function (k) {
       if (nearFace.indexOf(k) >= 0) add({ id: 'sheen', group: 'sheen', score: 0.35, slots: [k], cloth: true,
         text: what(k) + ': shiny cloth near the face competes with the skin\'s own shine and makes everything look cheaper (Outfit Check, question 4). Choose the matte version.' });
-      else if (k === 'shoes') add({ id: 'sheen', group: 'sheen', score: o.occasion === 'evening' ? 0.85 : 0.55, slots: [k], cloth: true,
-        text: 'Patent shoes are for black tie' + (o.occasion === 'evening' ? '; for a formal evening they are right.' : '. Polish calf to a glow instead.') });
+      else if (k === 'shoes') {
+        add({ id: 'sheen', group: 'sheen', score: o.occasion === 'evening' ? 0.85 : 0.55, slots: [k], cloth: true,
+          text: 'Patent shoes are for black tie' + (o.occasion === 'evening' ? '; for a formal evening they are right.' : '. Polish calf to a glow instead.') });
+        // B: black-tie patent is black; a coloured patent shoe is a fashion piece, not the classic one
+        const lab = VC.hexToLab(L[k].hex);
+        if (C[k].id === 'patent' && (lab[0] > 25 || Math.hypot(lab[1], lab[2]) > 10)) add({ id: 'sheen', group: 'sheen', score: 0.6, slots: [k],
+          text: 'Patent leather for black tie comes in black; coloured patent is a fashion piece, not the classic one.' });
+      }
       else add({ id: 'sheen', group: 'sheen', score: 0.6, slots: [k], cloth: true, text: what(k) + ': shiny cloth looks cheap below the belt too. The matte version is the classic one.' });
     });
     if (!shiny.length) add({ id: 'sheen', group: 'sheen', score: 1, slots: [], text: 'Sheen: everything is matte or has only a soft sheen, which suits skin and keeps the outfit quiet.' });
@@ -932,7 +938,7 @@
      exception; a warm metal against cool colouring is a stray warm note, a cool one against warm
      colouring the reverse. A ring worn every day stands outside the matching rule, and glasses
      frames and an earring, at the face, are judged with the face. Stones are small accents. */
-  function accessoryChecks(acc, L, K, p, add, nm, occasion) {
+  function accessoryChecks(acc, L, K, p, add, nm, occasion, o) {
     const A = G.ACCESSORIES, M = G.metalBy, worn = A.filter(function (a) { return acc[a.key] && acc[a.key].on; });
     const ad = function (c) { c.group = 'accessory'; c.slots = c.slots || []; return add(c); };
     if (!worn.length) return;
@@ -941,6 +947,12 @@
     worn.forEach(function (a) {
       if (a.needs === 'cuffs' && !(L.shirt && K.shirt.collar)) ad({ id: 'acc', score: 0.2, acc: a.key,
         text: 'Cufflinks need a shirt with double cuffs; a ' + K.shirt.name.toLowerCase() + ' has none.' });
+      // B: double (French) cuffs come on dress shirtings; an oxford, flannel or chambray shirt nearly always has barrel cuffs
+      else if (a.needs === 'cuffs' && L.shirt && K.shirt.id === 'shirt') {
+        const sc = G.cloth('shirt', o.shirt);
+        if (sc && ['poplin', 'shirttwill', 'satinshirt'].indexOf(sc.id) < 0) ad({ id: 'acc', score: 0.55, acc: a.key,
+          text: 'Cufflinks need double (French) cuffs, and those come on dress shirtings (poplin or twill). A shirt in ' + sc.name.replace(/ \(shiny\)$/, '').toLowerCase() + ' nearly always has barrel cuffs; check yours has double ones.' });
+      }
       if (a.needs === 'tie' && !(L.tie && K.tie.id === 'tie')) ad({ id: 'acc', score: 0.2, acc: a.key, text: 'A tie bar needs a tie to hold.' });
     });
     // matching: everything but the ring and the face pieces
