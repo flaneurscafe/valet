@@ -1,0 +1,31 @@
+#!/bin/sh
+# SPDX-FileCopyrightText: 2026 Budgie Perruche <https://flaneurs.cafe/contact/>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Valet: checks before every commit. Refuses the commit if the Node tests or the type check fail.
+# Switch it on once, from the project folder:   git config core.hooksPath tools/hooks
+# Skip it once, knowingly:                        git commit --no-verify
+# Without Node.js on this computer it warns and lets the commit through, rather than blocking every commit.
+# It does not run the browser checks (tools/smoke.py, flows.py, fixes.py): MAINTAINING.md says when to.
+cd "$(git rev-parse --show-toplevel)" || exit 1
+# A git window (not a terminal) may not see Node: look where it is usually installed.
+for d in /usr/local/bin /usr/bin /opt/homebrew/bin "$HOME/.volta/bin" "$HOME/.local/bin" /snap/bin $(ls -d "$HOME"/.nvm/versions/node/*/bin 2>/dev/null | sort -V | tail -n 1); do
+  [ -x "$d/node" ] && PATH="$PATH:$d"
+done
+if ! command -v node > /dev/null 2>&1; then
+  echo "pre-commit: Node.js not found, so the tests were NOT run; the commit goes ahead."
+  echo "pre-commit: install Node.js (or make it findable) for the hook to check anything."
+  exit 0
+fi
+echo "pre-commit: node tests/run.js (about a minute)"
+if ! node tests/run.js > /tmp/valet-precommit.log 2>&1; then
+  tail -n 30 /tmp/valet-precommit.log
+  echo "pre-commit: the tests failed, so the commit was refused (whole log: /tmp/valet-precommit.log)"
+  exit 1
+fi
+tail -n 1 /tmp/valet-precommit.log
+echo "pre-commit: node tools/typecheck.js"
+if ! node tools/typecheck.js; then
+  echo "pre-commit: the type check failed, so the commit was refused"
+  exit 1
+fi
+exit 0
