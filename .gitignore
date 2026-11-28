@@ -3,3 +3,5 @@
 # a TypeScript installed for node tools/typecheck.js
 node_modules/
 package-lock.json
+# Python caches (tools/cssusage.py imports smoke.py and flows.py)
+__pycache__/
